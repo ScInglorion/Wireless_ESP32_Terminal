@@ -15,7 +15,10 @@
 #include "lwip/sys.h"
 #include "lwip/netdb.h"
 #include "lwip/dns.h"
-
+#include "esp_console.h"
+#include "linenoise/linenoise.h"
+#include "driver/uart.h"
+#include "driver/gpio.h"
 /*Definitions*/
 #define WIFI_SUCCESS 1 << 0
 #define WIFI_FAILURE 1 << 1
@@ -27,7 +30,8 @@
 #define CHANNEL 11
 #define MAX_DEV 4
 #define PORT 12345
-
+#define TXD_PIN (GPIO_NUM_4)
+#define RXD_PIN (GPIO_NUM_5)
 #define KEEPALIVE_IDLE              1
 #define KEEPALIVE_INTERVAL          1
 #define KEEPALIVE_COUNT             1
@@ -36,8 +40,13 @@
 // Tags
 static const char*WI_TAG  = "Wifi";
 static const char *TCP_TAG  = "TCP";
+static const char *UART_TAG  = "UART";
+static const int RX_BUF_SIZE = 1024;
 
-static EventGroupHandle_t wifi_event_group;
+// socket definition
+int sock;
+int sockl;
+static char buffer[1024];  
 
 // AP event handler
 static void wifi_event_handler(void* arg, esp_event_base_t event_base,
@@ -55,10 +64,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 }
 
 
-void wifi_init_softap(void)
-{
-    int status = WIFI_FAILURE;
-
+void wifi_init_softap(void){
     //initialize the esp network interface
     ESP_ERROR_CHECK(esp_netif_init());
 
@@ -105,44 +111,171 @@ void wifi_init_softap(void)
 
     ESP_LOGI(WI_TAG, "wifi_init_softap finished. SSID:%s password:%s channel:%d",
              SSID, PASS, CHANNEL);
+}
 
 
-    //     EventBits_t bits = xEventGroupWaitBits(wifi_event_group,
-    //         WIFI_SUCCESS | WIFI_FAILURE,
-    //         pdFALSE,
-    //         pdFALSE,
-    //         portMAX_DELAY);
 
-    // if (bits & WIFI_SUCCESS) {
-    //     ESP_LOGI(WI_TAG, "AP createrd");
-    //     status = WIFI_SUCCESS;
-    // } else if (bits & WIFI_FAILURE) {
-    //     ESP_LOGI(WI_TAG, "Failed to create AP");
-    //     status = WIFI_FAILURE;
-    // } else {
-    //     ESP_LOGE(WI_TAG, "UNEXPECTED EVENT");
-    //     status = WIFI_FAILURE;
-    // }         
-   // return status;
+void socket_creation(void)
+{
+	struct sockaddr_in server ; 
+    // int keepAlive = 1;
+    // int keepIdle = KEEPALIVE_IDLE;
+    // int keepInterval = KEEPALIVE_INTERVAL;
+    // int keepCount = KEEPALIVE_COUNT;
+	server.sin_family = AF_INET;
+	server.sin_addr.s_addr = INADDR_ANY;
+	server.sin_port = htons(PORT);
+
+    // socket creation
+	sock = socket(AF_INET, SOCK_STREAM, 0);
+	if (sock < 0)
+	{
+		ESP_LOGE(TCP_TAG, "Failed to create a socket");
+	}
+    // bind
+    if(bind(sock, (struct sockaddr *) &server, sizeof(server)) != 0){
+        ESP_LOGE(TCP_TAG, "Failed binding");
+    }
+    // listen
+    int err = listen(sock, 5);
+    if(err !=0){
+        ESP_LOGE(TCP_TAG, "Failed listening");
+    }
+
+    struct sockaddr_storage source_addr; // Large enough for both IPv4 or IPv6
+    socklen_t addr_len = sizeof(source_addr);
+    sockl = accept(sock, (struct sockaddr *)&source_addr, &addr_len);
+    if (sockl < 0) {
+        ESP_LOGE(TCP_TAG, "Unable to accept connection: errno %d", errno);                                                                                            
+    }
+
+    //bzero(Buffer, sizeof(Buffer));
+   // int r = write(sock, Buffer, sizeof(Buffer)-1);
+
+    // accept
+    // clilen = sizeof(cli_addr);
+    // int newsockfd = accept(sock, (struct sockaddr *) &cli_addr, &clilen);
+
+    // if (newsockfd != 1){
+    //     ESP_LOGE(TAG, "btuh");
+    // }
+
+
+//     while (1) {
+
+//         ESP_LOGI(TCP_TAG, "Socket listening");
+
+//         struct sockaddr_storage source_addr; // Large enough for both IPv4 or IPv6
+//         socklen_t addr_len = sizeof(source_addr);
+//         int sockl = accept(sock, (struct sockaddr *)&source_addr, &addr_len);
+//         if (sockl < 0) {
+//             ESP_LOGE(TCP_TAG, "Unable to accept connection: errno %d", errno);
+//             ESP_LOGE(TCP_TAG, "wagt");
+//             break;
+//         }
+
+//         // Set tcp keepalive option
+//         setsockopt(sockl, SOL_SOCKET, SO_KEEPALIVE, &keepAlive, sizeof(int));
+//         setsockopt(sockl, IPPROTO_TCP, TCP_KEEPIDLE, &keepIdle, sizeof(int));
+//         setsockopt(sockl, IPPROTO_TCP, TCP_KEEPINTVL, &keepInterval, sizeof(int));
+//         setsockopt(sockl, IPPROTO_TCP, TCP_KEEPCNT, &keepCount, sizeof(int));
+//         // Convert ip address to string
+// // #ifdef CONFIG_EXAMPLE_IPV4
+// //         if (source_addr.ss_family == PF_INET) {
+// //             inet_ntoa_r(((struct sockaddr_in *)&source_addr)->sin_addr, addr_str, sizeof(addr_str) - 1);
+// //         }
+// // #endif
+//         ESP_LOGI(TCP_TAG, "Socket accepted ip address: ");
+
+//         //do_retransmit(sock);
+//          ESP_LOGE(TCP_TAG, "wagt");
+//         shutdown(sockl, 0);
+//         close(sockl);
+        
+//    }
+}
+
+void init(void) {
+    const uart_config_t uart_config = {
+        .baud_rate = 115200,
+        .data_bits = UART_DATA_8_BITS,
+        .parity = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .source_clk = UART_SCLK_DEFAULT,
+    };
+    // We won't use a buffer for sending data.
+    uart_driver_install(UART_NUM_1, RX_BUF_SIZE * 2, 0, 0, NULL, 0);
+    uart_param_config(UART_NUM_1, &uart_config);
+    uart_set_pin(UART_NUM_1, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+}
+
+int sendData(const char* logName, const char* data)
+{
+    const int len = strlen(data);
+    const int txBytes = uart_write_bytes(UART_NUM_1, data, len);
+    ESP_LOGI(logName, "Wrote %d bytes", txBytes);
+    return txBytes;
+}
+
+static void tx_task(void *arg)
+{
+    static const char *TX_TASK_TAG = "TX_TASK";
+    esp_log_level_set(TX_TASK_TAG, ESP_LOG_INFO);
+    while (1) {
+        sendData(TX_TASK_TAG, "Hello world");
+        vTaskDelay(2000 / portTICK_PERIOD_MS);
+    }
+}
+
+static void rx_task(void *arg)
+{
+    static const char *RX_TASK_TAG = "RX_TASK";
+    esp_log_level_set(RX_TASK_TAG, ESP_LOG_INFO);
+    uint8_t* data = (uint8_t*) malloc(RX_BUF_SIZE+1);
+    while (1) {
+        bzero(data, 1024);
+        const int rxBytes = uart_read_bytes(UART_NUM_1, data, RX_BUF_SIZE, 1000 / portTICK_PERIOD_MS);
+        if (rxBytes > 0) {
+            data[rxBytes] = 0;
+            ESP_LOGI(RX_TASK_TAG, "Read %d bytes: '%s'", rxBytes, data);
+            bzero(buffer, sizeof(buffer));   
+            int n=0;      
+            while(data[n] != 0x0a){
+                buffer[n] = (char)data[n];
+                n++;
+            }
+            int r = write(sockl, buffer, sizeof(buffer)-1);
+            ESP_LOGI(WI_TAG, "%d", r);
+            for(int i = 0; i <13; i++) {
+                putchar(buffer[i]);
+            }
+            ESP_LOG_BUFFER_HEXDUMP(RX_TASK_TAG, data, rxBytes, ESP_LOG_INFO);
+            
+            
+        }
+    }
+    free(data); 
 }
 
 
 
 void app_main(void)
 {
-    esp_err_t status = WIFI_FAILURE;
     esp_err_t storage = nvs_flash_init();
     if (storage == ESP_ERR_NVS_NO_FREE_PAGES || storage == ESP_ERR_NVS_NEW_VERSION_FOUND) {
       ESP_ERROR_CHECK(nvs_flash_erase());
       storage = nvs_flash_init();
     }
     ESP_ERROR_CHECK(storage);
+    // Creat AP
     wifi_init_softap();
-    // if(status != WIFI_SUCCESS){
-    //     ESP_LOGI(WI_TAG, "AP creation failed");
-    //     return;
-    // }
-
-
-
-}
+    // Create socket
+    socket_creation();
+ESP_LOGE(TCP_TAG, "here1");
+    init();
+    ESP_LOGE(TCP_TAG, "here2");
+    xTaskCreate(rx_task, "uart_rx_task", 1024*2, NULL, configMAX_PRIORITIES, NULL);
+    ESP_LOGE(TCP_TAG, "here3");
+    xTaskCreate(tx_task, "uart_tx_task", 1024*2, NULL, configMAX_PRIORITIES-1, NULL);
+}   

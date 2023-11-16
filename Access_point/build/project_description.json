@@ -1,7 +1,7 @@
 {
     "version":            "1",
     "project_name":       "Access_point",
-    "project_version":    "fb51ffe-dirty",
+    "project_version":    "bddde7e-dirty",
     "project_path":       "C:/Espressif/frameworks/esp-idf-v5.1.1/projects/Thesis/Access_point",
     "idf_path":           "C:/Users/karnn/esp/esp-idf",
     "build_dir":          "C:/Espressif/frameworks/esp-idf-v5.1.1/projects/Thesis/Access_point/build",

@@ -32,6 +32,8 @@ static EventGroupHandle_t wifi_event_group;
 // number of retires 
 static int wifi_try_no = 0;
 
+// socket definition
+int soc;
 // task tags
 static const char *TAG_WI = "WIFI";
 static const char *TAG_TCP = "TCP";
@@ -156,9 +158,9 @@ esp_err_t connect_wifi()
     }
 
     /* The event wi ll not be processed after unregister */
-    // ESP_ERROR_CHECK(esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, got_ip_event_instance));
-    // ESP_ERROR_CHECK(esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_handler_event_instance));
-    // vEventGroupDelete(wifi_event_group);
+    ESP_ERROR_CHECK(esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, got_ip_event_instance));
+    ESP_ERROR_CHECK(esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_handler_event_instance));
+    vEventGroupDelete(wifi_event_group);
 
     return status;
 }
@@ -173,7 +175,7 @@ esp_err_t socket_connection(void){
     inet_pton(AF_INET, AP_IP, &ap_info.sin_addr);
 
     // socket creation
-    int soc = socket(AF_INET, SOCK_STREAM, 0);
+    soc = socket(AF_INET, SOCK_STREAM, 0);
     if(soc < 0){
         ESP_LOGI(TAG_TCP, "Socket creation Failed");
         return TCP_FAILURE;
@@ -187,6 +189,13 @@ esp_err_t socket_connection(void){
         return TCP_FAILURE;
     }
     ESP_LOGI(TAG_TCP, "Connected to TCP server");
+
+    // 	bzero(buffer, sizeof(buffer));
+    // int r = read(soc, buffer, sizeof(buffer)-1);
+    // for(int i = 0; i < r; i++) {
+    //     putchar(buffer[i]);
+    // }
+
 
     return TCP_SUCCESS;
 }
