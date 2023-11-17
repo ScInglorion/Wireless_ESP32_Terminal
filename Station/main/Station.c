@@ -190,11 +190,13 @@ esp_err_t socket_connection(void){
     }
     ESP_LOGI(TAG_TCP, "Connected to TCP server");
 
-    // 	bzero(buffer, sizeof(buffer));
-    // int r = read(soc, buffer, sizeof(buffer)-1);
-    // for(int i = 0; i < r; i++) {
-    //     putchar(buffer[i]);
-    // }
+    	bzero(buffer, sizeof(buffer));
+    int r = read(soc, buffer, sizeof(buffer)-1);
+    for(int i = 0; i < r; i++) {
+        putchar(buffer[i]);
+    }
+
+
 
 
     return TCP_SUCCESS;

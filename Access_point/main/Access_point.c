@@ -78,8 +78,6 @@ void wifi_init_softap(void){
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
 
-    // wifi_event_group = xEventGroupCreate();
-    // esp_event_handler_instance_t wifi_handler_event_instance;
    
     // checking for any wifi event with any wifi event type (connect/disconnect), and if it happens call wifi handler
     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
