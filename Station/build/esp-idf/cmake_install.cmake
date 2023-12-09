@@ -404,6 +404,26 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
+  include("C:/Espressif/frameworks/esp-idf-v5.1.1/projects/Thesis/Station/build/esp-idf/espressif__cmake_utilities/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("C:/Espressif/frameworks/esp-idf-v5.1.1/projects/Thesis/Station/build/esp-idf/espressif__esp_lcd_ili9341/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("C:/Espressif/frameworks/esp-idf-v5.1.1/projects/Thesis/Station/build/esp-idf/espressif__esp_lcd_touch/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
   include("C:/Espressif/frameworks/esp-idf-v5.1.1/projects/Thesis/Station/build/esp-idf/main/cmake_install.cmake")
+endif()
+
+if(NOT CMAKE_INSTALL_LOCAL_ONLY)
+  # Include the install script for the subdirectory.
+  include("C:/Espressif/frameworks/esp-idf-v5.1.1/projects/Thesis/Station/build/esp-idf/lvgl-release-v8.3/cmake_install.cmake")
 endif()
 

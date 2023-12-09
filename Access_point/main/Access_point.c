@@ -64,7 +64,8 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 }
 
 
-void wifi_init_softap(void){
+void wifi_init_softap(void)
+{
     //initialize the esp network interface
     ESP_ERROR_CHECK(esp_netif_init());
 
@@ -193,7 +194,8 @@ void socket_creation(void)
 //    }
 }
 
-void init(void) {
+void init(void) 
+{
     const uart_config_t uart_config = {
         .baud_rate = 115200,
         .data_bits = UART_DATA_8_BITS,
@@ -243,19 +245,17 @@ static void rx_task(void *arg)
                 buffer[n] = (char)data[n];
                 n++;
             }
+            ESP_LOGI(WI_TAG, "%s", buffer);
             int r = write(sockl, buffer, sizeof(buffer)-1);
             ESP_LOGI(WI_TAG, "%d", r);
             for(int i = 0; i <13; i++) {
                 putchar(buffer[i]);
             }
-            ESP_LOG_BUFFER_HEXDUMP(RX_TASK_TAG, data, rxBytes, ESP_LOG_INFO);
-            
-            
+            ESP_LOG_BUFFER_HEXDUMP(RX_TASK_TAG, data, rxBytes, ESP_LOG_INFO);             
         }
     }
     free(data); 
 }
-
 
 
 void app_main(void)

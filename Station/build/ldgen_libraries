@@ -59,4 +59,7 @@ C:/Espressif/frameworks/esp-idf-v5.1.1/projects/Thesis/Station/build/esp-idf/mqt
 C:/Espressif/frameworks/esp-idf-v5.1.1/projects/Thesis/Station/build/esp-idf/perfmon/libperfmon.a
 C:/Espressif/frameworks/esp-idf-v5.1.1/projects/Thesis/Station/build/esp-idf/spiffs/libspiffs.a
 C:/Espressif/frameworks/esp-idf-v5.1.1/projects/Thesis/Station/build/esp-idf/wifi_provisioning/libwifi_provisioning.a
+C:/Espressif/frameworks/esp-idf-v5.1.1/projects/Thesis/Station/build/esp-idf/espressif__esp_lcd_ili9341/libespressif__esp_lcd_ili9341.a
+C:/Espressif/frameworks/esp-idf-v5.1.1/projects/Thesis/Station/build/esp-idf/espressif__esp_lcd_touch/libespressif__esp_lcd_touch.a
 C:/Espressif/frameworks/esp-idf-v5.1.1/projects/Thesis/Station/build/esp-idf/main/libmain.a
+C:/Espressif/frameworks/esp-idf-v5.1.1/projects/Thesis/Station/build/esp-idf/lvgl-release-v8.3/liblvgl-release-v8.3.a
