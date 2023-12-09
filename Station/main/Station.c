@@ -380,7 +380,7 @@ void app_main(void)
 
     label2 = lv_label_create(obj1);
     lv_label_set_long_mode(label2, LV_LABEL_LONG_WRAP); 
-    lv_label_set_text(label2, "Jednak nie chujnia");
+    lv_label_set_text(label2, "Waiting for message");
     lv_obj_set_width(label2, 240);
     lv_obj_align(label2, LV_ALIGN_CENTER, 0, 0);
     
