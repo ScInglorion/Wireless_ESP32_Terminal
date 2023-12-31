@@ -47,6 +47,7 @@ static const int RX_BUF_SIZE = 1024;
 int sock;
 int sockl;
 static char buffer[1024];  
+static char read_buffer[255];
 
 // AP event handler
 static void wifi_event_handler(void* arg, esp_event_base_t event_base,
@@ -213,6 +214,7 @@ void init(void)
 int sendData(const char* logName, const char* data)
 {
     const int len = strlen(data);
+    ESP_LOGI("len", "%i", len);
     const int txBytes = uart_write_bytes(UART_NUM_1, data, len);
     ESP_LOGI(logName, "Wrote %d bytes", txBytes);
     return txBytes;
@@ -222,11 +224,25 @@ static void tx_task(void *arg)
 {
     static const char *TX_TASK_TAG = "TX_TASK";
     esp_log_level_set(TX_TASK_TAG, ESP_LOG_INFO);
-    while (1) {
-        sendData(TX_TASK_TAG, "Hello world");
-        vTaskDelay(2000 / portTICK_PERIOD_MS);
+    // while (1) {
+    //     sendData(TX_TASK_TAG, "Hello world");
+    //     vTaskDelay(2000 / portTICK_PERIOD_MS);
+    // }
+    while(1){
+        bzero(read_buffer, sizeof(read_buffer));
+        int r = read(sockl, read_buffer, sizeof(read_buffer));
+        if (r > 0){
+            ESP_LOGI("socket", "%i", r);
+            ESP_LOGI("socket", "%s", read_buffer);
+            for(int i = 0; i < r; i++) {
+                putchar(read_buffer[i]);
+            }
+            sendData(TX_TASK_TAG, read_buffer);
+            // uart_write_bytes(UART_NUM_1, read_buffer, TX_BUF_SIZE);        
+        }
+
     }
-}
+}  
 
 static void rx_task(void *arg)
 {
@@ -240,17 +256,7 @@ static void rx_task(void *arg)
             data[rxBytes] = 0;
             ESP_LOGI(RX_TASK_TAG, "Read %d bytes: '%s'", rxBytes, data);
             bzero(buffer, sizeof(buffer));   
-            int n=0;      
-            while(data[n] != 0x0a){
-                buffer[n] = (char)data[n];
-                n++;
-            }
-            ESP_LOGI(WI_TAG, "%s", buffer);
-            int r = write(sockl, buffer, sizeof(buffer)-1);
-            ESP_LOGI(WI_TAG, "%d", r);
-            for(int i = 0; i <13; i++) {
-                putchar(buffer[i]);
-            }
+            int r = write(sockl, data, rxBytes);
             ESP_LOG_BUFFER_HEXDUMP(RX_TASK_TAG, data, rxBytes, ESP_LOG_INFO);             
         }
     }
@@ -270,7 +276,7 @@ void app_main(void)
     wifi_init_softap();
     // Create socket
     socket_creation();
-ESP_LOGE(TCP_TAG, "here1");
+    ESP_LOGE(TCP_TAG, "here1");
     init();
     ESP_LOGE(TCP_TAG, "here2");
     xTaskCreate(rx_task, "uart_rx_task", 1024*2, NULL, configMAX_PRIORITIES, NULL);

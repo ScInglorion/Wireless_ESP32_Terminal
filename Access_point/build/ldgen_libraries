@@ -58,5 +58,8 @@ C:/Espressif/frameworks/esp-idf-v5.1.1/projects/Thesis/Access_point/build/esp-id
 C:/Espressif/frameworks/esp-idf-v5.1.1/projects/Thesis/Access_point/build/esp-idf/mqtt/libmqtt.a
 C:/Espressif/frameworks/esp-idf-v5.1.1/projects/Thesis/Access_point/build/esp-idf/perfmon/libperfmon.a
 C:/Espressif/frameworks/esp-idf-v5.1.1/projects/Thesis/Access_point/build/esp-idf/spiffs/libspiffs.a
+C:/Espressif/frameworks/esp-idf-v5.1.1/projects/Thesis/Access_point/build/esp-idf/touch_element/libtouch_element.a
+C:/Espressif/frameworks/esp-idf-v5.1.1/projects/Thesis/Access_point/build/esp-idf/ulp/libulp.a
+C:/Espressif/frameworks/esp-idf-v5.1.1/projects/Thesis/Access_point/build/esp-idf/usb/libusb.a
 C:/Espressif/frameworks/esp-idf-v5.1.1/projects/Thesis/Access_point/build/esp-idf/wifi_provisioning/libwifi_provisioning.a
 C:/Espressif/frameworks/esp-idf-v5.1.1/projects/Thesis/Access_point/build/esp-idf/main/libmain.a

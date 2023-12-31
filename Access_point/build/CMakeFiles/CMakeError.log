@@ -1,17 +1,0 @@
-Performing C SOURCE FILE Test C_COMPILER_SUPPORTS_WFORMAT_SIGNEDNESS failed with the following output:
-Change Dir: C:/Espressif/frameworks/esp-idf-v5.1.1/projects/Thesis/Access_point/build/CMakeFiles/CMakeTmp
-
-Run Build Command(s):C:/Users/karnn/.espressif/tools/ninja/1.10.2/ninja.exe cmTC_b9629 && ninja: error: unknown target 'cmTC_b9629'
-
-
-Source file was:
-int main(void) { return 0; }
-Detecting C compiler ABI info failed to compile with the following output:
-Change Dir: C:/Espressif/frameworks/esp-idf-v5.1.1/projects/Thesis/Access_point/build/CMakeFiles/CMakeTmp
-
-Run Build Command(s):C:/Users/karnn/.espressif/tools/ninja/1.10.2/ninja.exe cmTC_199ec && ninja: error: loading 'build.ninja': Nie mo┐na odnalečŠ okreťlonego pliku.
-
-
-
-
-
