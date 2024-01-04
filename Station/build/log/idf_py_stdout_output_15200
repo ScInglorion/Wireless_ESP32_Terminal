@@ -15,8 +15,6 @@
 -- Detecting CXX compile features
 -- Detecting CXX compile features - done
 -- Building ESP-IDF components for target esp32
-Target changed from esp32s2 to esp32, solving dependencies.
-........Updating lock file at C:\Espressif\frameworks\esp-idf-v5.1.1\projects\Thesis\Station\dependencies.lock
 Processing 4 dependencies:
 [1/4] espressif/cmake_utilities (0.5.3)
 [2/4] espressif/esp_lcd_ili9341 (1.2.0)
@@ -35,7 +33,7 @@ Loading defaults file C:/Espressif/frameworks/esp-idf-v5.1.1/projects/Thesis/Sta
 -- Found Python3: C:/Users/karnn/.espressif/python_env/idf5.1_py3.11_env/Scripts/python.exe (found version "3.11.2") found components: Interpreter 
 -- Performing Test C_COMPILER_SUPPORTS_WFORMAT_SIGNEDNESS
 -- Performing Test C_COMPILER_SUPPORTS_WFORMAT_SIGNEDNESS - Success
--- App "Station" version: a8d61eb-dirty
+-- App "Station" version: 5c0ffee-dirty
 -- Adding linker script C:/Espressif/frameworks/esp-idf-v5.1.1/projects/Thesis/Station/build/esp-idf/esp_system/ld/memory.ld
 -- Adding linker script C:/Users/karnn/esp/esp-idf/components/esp_system/ld/esp32/sections.ld.in
 -- Adding linker script C:/Users/karnn/esp/esp-idf/components/esp_rom/esp32/ld/esp32.rom.ld

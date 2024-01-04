@@ -19,6 +19,14 @@
         "tuple": "c",
         "type_traits": "c",
         "utility": "c",
-        "linenoise.h": "c"
+        "linenoise.h": "c",
+        "memory_resource": "c",
+        "memory": "c",
+        "fstream": "c",
+        "istream": "c",
+        "ostream": "c",
+        "sstream": "c",
+        "streambuf": "c",
+        "*.inc": "c"
     }
 }

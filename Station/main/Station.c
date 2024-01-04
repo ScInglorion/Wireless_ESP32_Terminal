@@ -1,5 +1,4 @@
 #include <string.h>
-#include <stdio.h>
 #include <memory.h>
 #include <time.h>
 #include "freertos/FreeRTOS.h"
@@ -19,14 +18,12 @@
 #include "esp_err.h"
 #include "lvgl.h"
 #include "esp_lcd_ili9341.h"
-
-#include "lwip/err.h"
 #include "lwip/sockets.h"
-#include "lwip/sys.h"
-#include "lwip/netdb.h"
-#include "lwip/dns.h"
 
 /*Definitions*/
+#define KEEPALIVE_IDLE              1
+#define KEEPALIVE_INTERVAL          1
+#define KEEPALIVE_COUNT             1
 #define WIFI_SUCCESS 1 << 0
 #define WIFI_FAILURE 1 << 1
 #define TCP_SUCCESS 1 << 0
@@ -52,7 +49,6 @@
 #define RST_PIN 22
 #define TFT_CS_PIN 4
 #define BK_LIGHT_PIN 2
-#define TOUCH_CS_PIN 15
 
 // Keypad
 #define R1 13
@@ -80,6 +76,7 @@
 static u_int8_t repeat = 0; // states which of states of letter in button is used 
 static u_int8_t spec_num = 0; // states which position was used last time button was used
 static char word[255]; // stores letter inputed by keypad
+static char frame[255];
 static char placeholder[255]; // created here due to occasional stack overflow happening if created inside the function. Stores letters from word minus last position
 static u_int8_t position = 0; // stores the position of last character in word 
 const char keypad[] = { 
@@ -122,19 +119,41 @@ static EventGroupHandle_t wifi_event_group;
 
 // number of retires 
 static int wifi_try_no = 0;
-esp_err_t wifistatus;
+int socket_status = -1;
 
 // socket definition
 int soc;
 char buffer[1024];
 char send_buffer[255];
 
-
 // task tags
 static const char *TAG_WI = "WIFI";
 static const char *TAG_TCP = "TCP";
 static const char *TFT_TAG = "Display";
 static const char *KEYPAD_TAG = "Keypad";
+
+/*Frame functions*/
+unsigned char Calculate_Crc(char frameid, char framelength, const char *data, u_int8_t length){
+    unsigned char crc = 0x5a;
+    crc += frameid;
+    crc += framelength;
+    // starts from one due to position 0 being frameid
+    for(u_int8_t i = 1; i < length; i++){
+        crc += data[i];
+    }
+    return crc % 256;
+}
+
+unsigned char Calculate_Xor(char frameid, char framelength, const char *data, u_int8_t length){
+    unsigned char crc_xor = 0x5a;
+    crc_xor ^= frameid;
+    crc_xor ^= framelength;
+    for(u_int8_t i = 1; i < length; i++){
+        crc_xor ^= data[i];
+    }
+    return crc_xor;
+
+}   
 
 // event handler for wifi events
 static void wifi_event_handler(void* arg, esp_event_base_t event_base,
@@ -152,7 +171,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
 		if (wifi_try_no < MAX_FAILURES)
 		{
 			ESP_LOGI(TAG_WI, "Reconnecting to AP");
-			ESP_ERROR_CHECK(esp_wifi_connect());
+			esp_wifi_connect();
 			wifi_try_no++;
 		} else {
 			xEventGroupSetBits(wifi_event_group, WIFI_FAILURE);
@@ -255,12 +274,6 @@ esp_err_t connect_wifi()
         ESP_LOGE(TAG_WI, "UNEXPECTED EVENT");
         status = WIFI_FAILURE;
     }
-
-    /* The event wi ll not be processed after unregister */
-    ESP_ERROR_CHECK(esp_event_handler_instance_unregister(IP_EVENT, IP_EVENT_STA_GOT_IP, got_ip_event_instance));
-    ESP_ERROR_CHECK(esp_event_handler_instance_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_handler_event_instance));
-    vEventGroupDelete(wifi_event_group);
-
     return status;
 }
 
@@ -286,25 +299,27 @@ esp_err_t socket_connection(void){
         close(soc);
         return TCP_FAILURE;
     }
+    socket_status = 0;
     ESP_LOGI(TAG_TCP, "Connected to TCP server");
     return TCP_SUCCESS;
 }
 
 static void socket_read(lv_obj_t *display){    
     while(1){
-        bzero(buffer, sizeof(buffer));
-        int r = read(soc, buffer, sizeof(buffer));
-        ESP_LOGI("socket", "%i", r);
-        ESP_LOGI("socket", "%s", buffer);
-        lv_label_set_text(display, buffer);
-        for(int i = 0; i < r; i++) {
-            putchar(buffer[i]);
+        if(socket_status == 0){
+            bzero(buffer, sizeof(buffer));
+            int r = read(soc, buffer, sizeof(buffer));
+            ESP_LOGI("socket", "%i", r);
+            ESP_LOGI("socket", "%s", buffer);
+            lv_label_set_text(display, buffer);         
+        }
+        else{
+            vTaskDelay(10 / portTICK_PERIOD_MS);
         }
     }
 }
 
 /* Display */
-
 static bool lvgl_flush_ready(esp_lcd_panel_io_handle_t panel_io, esp_lcd_panel_io_event_data_t *edata, void *user_ctx)
 {
     lv_disp_drv_t *disp_driver = (lv_disp_drv_t *)user_ctx;
@@ -478,6 +493,11 @@ void keypad_delete()
 
 
 static void keypadtask(lv_obj_t *txt){
+    // spliting 16 bit number into 2 8bit numbers for prefix
+    short frameid = 0xAA55;
+    char frameid_bytes[2];
+    frameid_bytes[0] = (frameid >> 8) & 0xFF;
+    frameid_bytes[1] = frameid & 0xFF;
     static char safty_skip_flag = 'f';
     while(true)
     {
@@ -487,6 +507,12 @@ static void keypadtask(lv_obj_t *txt){
             /* Pehaps add safty measure for array opverflow*/
             word[position] = keypressed;
             word[position + 1] = '\0';
+            if(position == 0){
+                frame[2] = keypressed;
+            }
+            else{
+                frame[position + 3] = keypressed;
+            }
             ESP_LOGI(KEYPAD_TAG, "Pressed key: %c\n", keypressed);
             ESP_LOGI(KEYPAD_TAG, "Pressed key: %s\n", word);
             lv_textarea_set_text(txt, word);
@@ -501,6 +527,7 @@ static void keypadtask(lv_obj_t *txt){
             lv_textarea_set_text(txt, word);
             position = 0;
             safty_skip_flag = 'f';
+            strcpy(frame, frameid_bytes);
         }
         else if (keypressed == 'D' && safty_skip_flag == 't'){ // going onto next character
             ESP_LOGI(KEYPAD_TAG, "Pressed key: %c\n", keypressed);
@@ -516,6 +543,12 @@ static void keypadtask(lv_obj_t *txt){
             position --;
             for(int i=0; i < position; i++){
                 word[i] = placeholder[i];
+                if(i == 0){
+                    frame[2] = placeholder[i];
+                }
+                else{
+                    frame[3+i] = placeholder[i];
+                }
             }
             word[position] = '\0';
             safty_skip_flag = 'f';
@@ -523,36 +556,34 @@ static void keypadtask(lv_obj_t *txt){
         }
         else if(keypressed == '#'){
             ESP_LOGI(KEYPAD_TAG, "Pressed key: %c\n", keypressed);
+            if(position > 0){
+                uint8_t* frame = (uint8_t*) malloc(position+6);
+                frame[0] = frameid_bytes[0];
+                frame[1] = frameid_bytes[1];
+                frame[2] = word[0]; // at least for now, FrameId is the same as the first input of keypad
+                frame[3] = position+6; // length of frame, 6 for fields besides data, position for data, as first number in data is for frameid for now (otherwise would be position +1)
+                for(u_int8_t i = 1; i < position+1; i++){
+                    frame[3+i] = word[i];
+                }
+                frame[position + 4] = Calculate_Crc(frame[2], frame[3], word, position+1);
+                frame[position + 5] = Calculate_Xor(frame[2], frame[3], word, position+1);
+                ESP_LOGI("frame", "%s", frame);
+                ESP_LOG_BUFFER_HEXDUMP("dump", frame, position+6, ESP_LOG_INFO);
+                if(socket_status == 0){                  
+                    ESP_LOGI("socket", "%s", frame);
+                    int w = write(soc, frame, position+6);                   
+                }
+                free(frame);
+            }
+     
             position = 0;
             safty_skip_flag = 'f';
-            if(wifistatus == TCP_SUCCESS){
-                bzero(send_buffer, sizeof(send_buffer));
-                strcpy(send_buffer, word);
-                ESP_LOG_BUFFER_HEXDUMP("dsadsa", send_buffer, sizeof(send_buffer), ESP_LOG_INFO);
-                ESP_LOGI("socket", "%s", send_buffer);
-                int w = write(soc, send_buffer, sizeof(send_buffer));
-            }
         }        
         vTaskDelay(10 / portTICK_PERIOD_MS);
     }
 }
 
-void app_main(void)
-{
-
-    wifistatus = WIFI_FAILURE;
-    // Initialize Non-volatile memory
-    esp_err_t storage = nvs_flash_init();
-    if(storage == ESP_ERR_NVS_NO_FREE_PAGES || storage == ESP_ERR_NVS_NEW_VERSION_FOUND){
-        ESP_ERROR_CHECK(nvs_flash_erase());
-        storage = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK(storage);
-    gpio_num_t keypad[8] = {R1, R2, R3, R4, C1, C2, C3, C4};
-    // Initialize keyboard
-    keypad_initalize(keypad);
-
-    /*Probably gcould colse it inside a functon up untill lv_iit*/
+void display_initialize(){
     static lv_disp_draw_buf_t disp_buf; // contains internal graphic buffer
     static lv_disp_drv_t disp_drv;      // contains callback functions
 
@@ -642,7 +673,57 @@ void app_main(void)
     esp_timer_handle_t lvgl_tick_timer = NULL;
     ESP_ERROR_CHECK(esp_timer_create(&lvgl_tick_timer_args, &lvgl_tick_timer));
     ESP_ERROR_CHECK(esp_timer_start_periodic(lvgl_tick_timer, LVGL_TICK_PERIOD_MS * 1000));
+}
 
+void keep(){
+    struct sockaddr_in ap_info = {0};
+    ap_info.sin_family = AF_INET;
+    ap_info.sin_port = htons(PORT);
+    inet_pton(AF_INET, AP_IP, &ap_info.sin_addr);
+    while (1){
+        int keepAlive = 1;
+        int keepIdle = KEEPALIVE_IDLE;
+        int keepInterval = KEEPALIVE_INTERVAL;
+        int keepCount = KEEPALIVE_COUNT;
+        int w = setsockopt(soc, SOL_SOCKET, SO_KEEPALIVE, &keepAlive, sizeof(int));
+        setsockopt(soc, IPPROTO_TCP, TCP_KEEPIDLE, &keepIdle, sizeof(int));
+        setsockopt(soc, IPPROTO_TCP, TCP_KEEPINTVL, &keepInterval, sizeof(int));
+        setsockopt(soc, IPPROTO_TCP, TCP_KEEPCNT, &keepCount, sizeof(int));   
+        ESP_LOGI("soccc", "%i", w);     
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        if(w != 0){
+            close(soc);
+            socket_status = -1;
+            soc = socket(AF_INET, SOCK_STREAM, 0);
+            if(soc < 0){
+                ESP_LOGI(TAG_TCP, "Socket creation Failed");
+            }
+            if(connect(soc, (struct sockaddr *)&ap_info, sizeof(ap_info)) != 0){
+                ESP_LOGI(TAG_TCP, "Unable to to connect to %s", inet_ntoa(ap_info.sin_addr.s_addr));
+                close(soc);
+            }else{
+                socket_status = 0;
+            }
+            
+        }
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+}
+
+void app_main(void)
+{
+    int wifistatus = WIFI_FAILURE;
+    // Initialize Non-volatile memory
+    esp_err_t storage = nvs_flash_init();
+    if(storage == ESP_ERR_NVS_NO_FREE_PAGES || storage == ESP_ERR_NVS_NEW_VERSION_FOUND){
+        ESP_ERROR_CHECK(nvs_flash_erase());
+        storage = nvs_flash_init();
+    }
+    ESP_ERROR_CHECK(storage);
+    gpio_num_t keypad[8] = {R1, R2, R3, R4, C1, C2, C3, C4};
+    // Initialize keyboard
+    keypad_initalize(keypad);
+    display_initialize();
     // Create display interface 
     lv_obj_t *label1 = lv_label_create(lv_scr_act());
     lv_label_set_long_mode(label1, LV_LABEL_LONG_WRAP); 
@@ -668,7 +749,6 @@ void app_main(void)
     lv_obj_set_size(txt_area, 280, 60);
     lv_obj_align(txt_area, LV_ALIGN_CENTER, 0, 65);
    
-
     // Connect to AP
     wifistatus = connect_wifi();
     if(wifistatus != WIFI_SUCCESS){
@@ -687,7 +767,8 @@ void app_main(void)
     ESP_LOGE(TAG_WI, "Breaks here 23123213");
    
     xTaskCreate(keypadtask, "keypad task", 1024*2, txt_area, configMAX_PRIORITIES - 1, NULL);
-    xTaskCreate(disRefresh, "disp refresh task", 1024*4, NULL,configMAX_PRIORITIES ,NULL);
+    xTaskCreate(disRefresh, "disp refresh task", 1024*8, NULL,configMAX_PRIORITIES,NULL);
+    xTaskCreate(keep, "alive_task", 1024*2, NULL, configMAX_PRIORITIES-2, NULL);
     }
 
 
