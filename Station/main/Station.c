@@ -73,38 +73,43 @@
 #define KEYPAD_DEBOUNCING 100   // < time in ms
 #define KEYPAD_STACKSIZE  5
 
+// Shouldnt do that but oh well
+lv_obj_t *label3;
+lv_obj_t *label4;
+
 static u_int8_t repeat = 0; // states which of states of letter in button is used 
 static u_int8_t spec_num = 0; // states which position was used last time button was used
 static char word[255]; // stores letter inputed by keypad
 static char frame[255];
 static char placeholder[255]; // created here due to occasional stack overflow happening if created inside the function. Stores letters from word minus last position
+static char received_data[250];
 static u_int8_t position = 0; // stores the position of last character in word 
 const char keypad[] = { 
-    '1', '2', '3', 'A',
-    '4', '5', '6', 'B',
+    '1', '2', '3', '.',
+    '4', '5', '6', '+',
     '7', '8', '9', 'C',
     '`', '0', '#', 'D'
 };  
 
 const char keypad1[] = { 
-    'a', 'd', 'g', 'A',
-    'j', 'm', 'p', 'B',
+    'a', 'd', 'g', ',',
+    'j', 'm', 'p', '-',
     's', 'v', 'y', 'C',
     '`', ' ', '#', 'D'
 };  
 
 const char keypad2[] = { 
-    'b', 'e', 'h', 'A',
-    'k', 'n', 'q', 'B',
+    'b', 'e', 'h', '!',
+    'k', 'n', 'q', '*',
     't', 'w', 'z', 'C',
     '`', '_', '#', 'D'
 };  
 
 const char keypad3[] = { 
-    'c', 'f', 'i', 'A',
-    'l', 'o', 'r', 'B',
-    'u', 'x', '?', 'C',
-    '`', '-', '#', 'D'
+    'c', 'f', 'i', '?',
+    'l', 'o', 'r', '/',
+    'u', 'x', '$', 'C',
+    '`', '=', '#', 'D'
 };  
 
 static gpio_num_t _keypad_pins[8];
@@ -308,10 +313,56 @@ static void socket_read(lv_obj_t *display){
     while(1){
         if(socket_status == 0){
             bzero(buffer, sizeof(buffer));
+            bzero(received_data, sizeof(received_data));
             int r = read(soc, buffer, sizeof(buffer));
-            ESP_LOGI("socket", "%i", r);
-            ESP_LOGI("socket", "%s", buffer);
-            lv_label_set_text(display, buffer);         
+            if (r > 0){
+                ESP_LOGI("socket", "%i", r);
+                ESP_LOGI("socket", "%s", buffer);
+                ESP_LOG_BUFFER_HEXDUMP("dump", buffer, r, ESP_LOG_INFO);
+                switch(buffer[2]){ 
+                    case 48: // wilgotnosc, do 99
+                        strcpy(received_data, "Temperatura: ");
+                        ESP_LOGI("ds", "%s",received_data);
+                        for(int i = 13; i < r + 7; i++){
+                            received_data[i] = buffer[i - 9];
+                        }
+                        if(r > 9 || (r == 9 && (buffer[4] > '1' || (buffer[4] == '1' && (buffer[5] > '0' || buffer[6] > '0'))))){
+                            lv_label_set_text(label3, "0x03");
+                        }
+                        else{
+                            lv_label_set_text(label3, "0x00");
+                        }
+                         
+                        lv_label_set_text(display, received_data);                         
+                        ESP_LOGI("sadge", "%s",received_data);
+                        break; 
+                    case 49: // tekst
+                        strcpy(received_data, "Komunikat: ");
+                        for(int i = 11; i < r + 5; i++){
+                            received_data[i] = buffer[i - 7];
+                        }
+                        lv_label_set_text(label3, "0x00"); 
+                        lv_label_set_text(display, received_data);                                                 
+                        break;
+                    case 50: // read_only  
+                        strcpy(received_data, "Wilgotnosc: ");
+  
+                        for(int i = 12; i < r + 6; i++){
+                            received_data[i] = buffer[i - 8];
+                        }                            
+                        if(r > 9 || (r == 9 && (buffer[4] > '1' || (buffer[4] == '1' && (buffer[5] > '0' || buffer[6] > '0'))))){
+                            lv_label_set_text(label3, "0x03");
+                        }
+                        else{
+                            lv_label_set_text(label3, "0x00");
+                        } 
+                        lv_label_set_text(display, received_data);                          
+                        break;
+                    default:
+                        lv_label_set_text(label3, "0x01"); 
+                        lv_label_set_text(display, "Nie rozpoznano FrameID"); 
+                }              
+            }        
         }
         else{
             vTaskDelay(10 / portTICK_PERIOD_MS);
@@ -561,17 +612,61 @@ static void keypadtask(lv_obj_t *txt){
                 frame[0] = frameid_bytes[0];
                 frame[1] = frameid_bytes[1];
                 frame[2] = word[0]; // at least for now, FrameId is the same as the first input of keypad
-                frame[3] = position+6; // length of frame, 6 for fields besides data, position for data, as first number in data is for frameid for now (otherwise would be position +1)
                 for(u_int8_t i = 1; i < position+1; i++){
                     frame[3+i] = word[i];
                 }
-                frame[position + 4] = Calculate_Crc(frame[2], frame[3], word, position+1);
-                frame[position + 5] = Calculate_Xor(frame[2], frame[3], word, position+1);
+                if (frame[position+3] == 0x00){
+                    frame[3] = position+5; // length of frame, 5 for fields besides data, position for data, as first number in data is for frameid for now (otherwise would be position +1), and we don't take into account the field with null value created by pressing D
+                    frame[position + 3] = Calculate_Crc(frame[2], frame[3], word, position);
+                    frame[position + 4] = Calculate_Xor(frame[2], frame[3], word, position);
+                ESP_LOGI("frame", "%s", frame);
+                ESP_LOG_BUFFER_HEXDUMP("dump", frame, position+5, ESP_LOG_INFO);
+                }
+                else{
+                    frame[3] = position+6; // length of frame, 6 for fields besides data, position for data, as first number in data is for frameid for now (otherwise would be position +1)
+                    frame[position + 4] = Calculate_Crc(frame[2], frame[3], word, position+1);
+                    frame[position + 5] = Calculate_Xor(frame[2], frame[3], word, position+1);
                 ESP_LOGI("frame", "%s", frame);
                 ESP_LOG_BUFFER_HEXDUMP("dump", frame, position+6, ESP_LOG_INFO);
-                if(socket_status == 0){                  
-                    ESP_LOGI("socket", "%s", frame);
-                    int w = write(soc, frame, position+6);                   
+                }
+
+                switch(frame[2]){ 
+                    case '0': // temperatura do 100  if(r > 9 || (r == 9 && (buffer[4] > '1' || (buffer[4] == '1' && (buffer[5] > '0' || buffer[6] > '0')))))
+                        if((position > 3 && word[position] != '\0') || ((position == 3 || position == 4) && (word[1] > '1' || (word[1] == '1' && (word[2] > '0' || word[3] > '0'))))){ // position > 2 && word[position] != '\0' jak byla wilgotnosc do 99
+                            ESP_LOGI("Frame_Error", "ERROR 0x03");
+                            lv_label_set_text(label4, "0x03");
+                        }
+
+                        else{ 
+                            if(socket_status == 0){                  
+                                ESP_LOGI("socket", "%s", frame);
+                                write(soc, frame, position+6);          
+                                ESP_LOGI("Frame_Error", "ERROR 0x00");
+                                lv_label_set_text(label4, "0x00");            
+                            }                            
+                        }
+                        break; 
+                    case '1': // tekst
+                       if(position > 249){
+                            ESP_LOGI("Frame_Error", "ERROR 0x03");
+                            lv_label_set_text(label4, "0x03");
+                        }
+                        else{ 
+                            if(socket_status == 0){                  
+                                ESP_LOGI("socket", "%s", frame);
+                                write(soc, frame, position+6);          
+                                ESP_LOGI("Frame_Error", "ERROR 0x00");
+                                lv_label_set_text(label4, "0x00");            
+                            }                            
+                        }
+                        break;
+                    case '2': // read_only (wilgotnosc)
+                        ESP_LOGI("Frame_Error", "ERROR 0x04");
+                        lv_label_set_text(label4, "0x04");   
+                        break;
+                    default:
+                        ESP_LOGI("Frame_Error", "ERROR 0x02");
+                        lv_label_set_text(label4, "0x02");   
                 }
                 free(frame);
             }
@@ -587,7 +682,7 @@ void display_initialize(){
     static lv_disp_draw_buf_t disp_buf; // contains internal graphic buffer
     static lv_disp_drv_t disp_drv;      // contains callback functions
 
-    ESP_LOGI(TFT_TAG, " TFR backlight off");
+    ESP_LOGI(TFT_TAG, "Turn off LCD backlight");
     gpio_config_t bk_gpio_config = {
         .mode = GPIO_MODE_OUTPUT,
         .pin_bit_mask = 1ULL << BK_LIGHT_PIN
@@ -676,23 +771,28 @@ void display_initialize(){
 }
 
 void keep(){
+    lv_obj_t *label6 = lv_label_create(lv_scr_act());
+    lv_label_set_text(label6, "soc_status: 0");
+    lv_obj_align(label6, LV_ALIGN_BOTTOM_RIGHT, -5, 0);
     struct sockaddr_in ap_info = {0};
     ap_info.sin_family = AF_INET;
     ap_info.sin_port = htons(PORT);
     inet_pton(AF_INET, AP_IP, &ap_info.sin_addr);
+    int keepAlive = 1;
+    int keepIdle = KEEPALIVE_IDLE;
+    int keepInterval = KEEPALIVE_INTERVAL;
+    int keepCount = KEEPALIVE_COUNT;
+    int w = 0;
     while (1){
-        int keepAlive = 1;
-        int keepIdle = KEEPALIVE_IDLE;
-        int keepInterval = KEEPALIVE_INTERVAL;
-        int keepCount = KEEPALIVE_COUNT;
-        int w = setsockopt(soc, SOL_SOCKET, SO_KEEPALIVE, &keepAlive, sizeof(int));
+        w = setsockopt(soc, SOL_SOCKET, SO_KEEPALIVE, &keepAlive, sizeof(int));
         setsockopt(soc, IPPROTO_TCP, TCP_KEEPIDLE, &keepIdle, sizeof(int));
         setsockopt(soc, IPPROTO_TCP, TCP_KEEPINTVL, &keepInterval, sizeof(int));
         setsockopt(soc, IPPROTO_TCP, TCP_KEEPCNT, &keepCount, sizeof(int));   
-        ESP_LOGI("soccc", "%i", w);     
+        ESP_LOGI("socket state", "%i", w);     
         vTaskDelay(1000 / portTICK_PERIOD_MS);
         if(w != 0){
             close(soc);
+            lv_label_set_text(label6, "soc_status: -1");
             socket_status = -1;
             soc = socket(AF_INET, SOCK_STREAM, 0);
             if(soc < 0){
@@ -701,8 +801,10 @@ void keep(){
             if(connect(soc, (struct sockaddr *)&ap_info, sizeof(ap_info)) != 0){
                 ESP_LOGI(TAG_TCP, "Unable to to connect to %s", inet_ntoa(ap_info.sin_addr.s_addr));
                 close(soc);
-            }else{
+            }
+            else{
                 socket_status = 0;
+                lv_label_set_text(label6, "soc_status: 0");
             }
             
         }
@@ -740,10 +842,30 @@ void app_main(void)
     lv_obj_set_width(label2, 240);
     lv_obj_align(label2, LV_ALIGN_CENTER, 0, 0);
     
-    lv_obj_t *label3 = lv_label_create(lv_scr_act());
+    lv_obj_t *obj2 = lv_obj_create(lv_scr_act());
+    lv_obj_set_size(obj2, 70, 45);
+    lv_obj_align(obj2, LV_ALIGN_LEFT_MID, 0, 5);
+
+    label3 = lv_label_create(obj2);
     lv_label_set_long_mode(label3, LV_LABEL_LONG_WRAP); 
-    lv_label_set_text_static(label3, "Text input that will be \nsent to paired device:");
-    lv_obj_align(label3, LV_ALIGN_CENTER, 0, 10);
+    lv_label_set_text(label3, "INerr");
+    lv_obj_set_width(label3, 40);
+    lv_obj_align(label3, LV_ALIGN_CENTER, 0, 0);
+
+    lv_obj_t *obj3 = lv_obj_create(lv_scr_act());
+    lv_obj_set_size(obj3, 70, 45);
+    lv_obj_align(obj3, LV_ALIGN_RIGHT_MID, 0, 5);
+
+    label4 = lv_label_create(obj3);
+    lv_label_set_long_mode(label4, LV_LABEL_LONG_WRAP); 
+    lv_label_set_text(label4, "Oerr");
+    lv_obj_set_width(label4, 40);
+    lv_obj_align(label4, LV_ALIGN_CENTER, 0, 0);
+    
+    lv_obj_t *label5 = lv_label_create(lv_scr_act());
+    lv_label_set_long_mode(label5, LV_LABEL_LONG_WRAP); 
+    lv_label_set_text_static(label5, "Text input that will be \nsent to paired device:");
+    lv_obj_align(label5, LV_ALIGN_CENTER, 0, 10);
 
     lv_obj_t *txt_area = lv_textarea_create(lv_scr_act());
     lv_obj_set_size(txt_area, 280, 60);
@@ -759,14 +881,9 @@ void app_main(void)
     wifistatus = socket_connection();
     if(wifistatus != TCP_SUCCESS){
         ESP_LOGE(TAG_TCP, "Failed socket connection");
-    }
-    ESP_LOGE(TAG_WI, "Breaks here");
-    if(wifistatus == TCP_SUCCESS){
-        xTaskCreate(socket_read, "Socket receive task", 1024*2, label2, configMAX_PRIORITIES, NULL);
-    }
-    ESP_LOGE(TAG_WI, "Breaks here 23123213");
-   
-    xTaskCreate(keypadtask, "keypad task", 1024*2, txt_area, configMAX_PRIORITIES - 1, NULL);
+    }     
+    xTaskCreate(socket_read, "Socket receive task", 1024*2, label2, configMAX_PRIORITIES, NULL);
+    xTaskCreate(keypadtask, "keypad task", 1024*4, txt_area, configMAX_PRIORITIES - 1, NULL);
     xTaskCreate(disRefresh, "disp refresh task", 1024*8, NULL,configMAX_PRIORITIES,NULL);
     xTaskCreate(keep, "alive_task", 1024*2, NULL, configMAX_PRIORITIES-2, NULL);
     }

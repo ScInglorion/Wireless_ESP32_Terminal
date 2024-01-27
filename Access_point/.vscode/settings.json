@@ -27,6 +27,7 @@
         "ostream": "c",
         "sstream": "c",
         "streambuf": "c",
-        "*.inc": "c"
+        "*.inc": "c",
+        "esp_netif.h": "c"
     }
 }

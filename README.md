@@ -1,1 +1,1 @@
-There will be a project here soon-ish!
+Relatively finished version of thesis, perhaps I'll revisit this later on. There is a lot that could be added, notably more advanced display UI, SD card usage, code optimazation

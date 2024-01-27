@@ -45,6 +45,7 @@ static void wifi_event_handler(void* arg, esp_event_base_t event_base,
         ESP_LOGI(WI_TAG, "station "MACSTR" join, AID=%d",
                  MAC2STR(event->mac), event->aid);
     } else if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
+        ESP_LOGI("socket status", "%i", socket_status);    
         wifi_event_ap_stadisconnected_t* event = (wifi_event_ap_stadisconnected_t*) event_data;
         ESP_LOGI(WI_TAG, "station "MACSTR" leave, AID=%d",
                  MAC2STR(event->mac), event->aid);
@@ -114,7 +115,6 @@ void socket_creation(void *arg){
             if(err !=0){
                 ESP_LOGE(TCP_TAG, "Failed listening");
             }
-
             struct sockaddr_storage source_addr;
             socklen_t addr_len = sizeof(source_addr);            
             sockl = accept(sock, (struct sockaddr *)&source_addr, &addr_len);
@@ -129,7 +129,7 @@ void socket_creation(void *arg){
         int keepIdle = KEEPALIVE_IDLE;
         int keepInterval = KEEPALIVE_INTERVAL;
         int keepCount = KEEPALIVE_COUNT;
-        int w = setsockopt(sockl, SOL_SOCKET, SO_KEEPALIVE, &keepAlive, sizeof(int));
+        w = setsockopt(sockl, SOL_SOCKET, SO_KEEPALIVE, &keepAlive, sizeof(int));
         setsockopt(sockl, IPPROTO_TCP, TCP_KEEPIDLE, &keepIdle, sizeof(int));
         setsockopt(sockl, IPPROTO_TCP, TCP_KEEPINTVL, &keepInterval, sizeof(int));
         setsockopt(sockl, IPPROTO_TCP, TCP_KEEPCNT, &keepCount, sizeof(int));   
@@ -137,8 +137,8 @@ void socket_creation(void *arg){
             close(sockl);
             socket_status = -1;
         }
-        ESP_LOGI("soccc", "%i", w);     
         vTaskDelay(1000 / portTICK_PERIOD_MS);
+        ESP_LOGI("socket status", "%i", w);     
     }    
 }
 
@@ -203,7 +203,7 @@ void app_main(void)
     ESP_ERROR_CHECK(storage);
     init_ap(); //initialize access point
     uart_init(); // initialize UART
-    xTaskCreate(socket_creation, "socket_task", 1024*2, NULL, configMAX_PRIORITIES-2, NULL); // Create Task resposnible for socket connection
+    xTaskCreate(socket_creation, "socket_task", 1024*2, NULL, configMAX_PRIORITIES, NULL); // Create Task resposnible for socket connection
     xTaskCreate(rx_task, "uart_rx_task", 1024*2, NULL, configMAX_PRIORITIES-1, NULL); //create task responsible for receiving data through UART
-    xTaskCreate(tx_task, "uart_tx_task", 1024*2, NULL, configMAX_PRIORITIES, NULL); // create task responsible for sending data through UART
+    xTaskCreate(tx_task, "uart_tx_task", 1024*2, NULL, configMAX_PRIORITIES-2, NULL); // create task responsible for sending data through UART
 }   

@@ -19,6 +19,10 @@
     "lv_refr.h": "c",
     "pretty_effect.h": "c",
     "esp_err.h": "c",
-    "esp_lcd_ili9341.h": "c"
+    "esp_lcd_ili9341.h": "c",
+    "*.tcc": "c",
+    "fstream": "c",
+    "regex": "c",
+    "stdio.h": "c"
   }
 }
