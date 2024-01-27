@@ -1,0 +1,33 @@
+{
+    "idf.portWin": "COM15",
+    "idf.adapterTargetName": "esp32s2",
+    "idf.openOcdConfigs": [
+        "board/esp32s2-bridge.cfg"
+    ],
+    "idf.flashType": "UART",
+    "files.associations": {
+        "esp_system.h": "c",
+        "esp_console.h": "c",
+        "array": "c",
+        "string": "c",
+        "string_view": "c",
+        "*.tcc": "c",
+        "ratio": "c",
+        "system_error": "c",
+        "functional": "c",
+        "regex": "c",
+        "tuple": "c",
+        "type_traits": "c",
+        "utility": "c",
+        "linenoise.h": "c",
+        "memory_resource": "c",
+        "memory": "c",
+        "fstream": "c",
+        "istream": "c",
+        "ostream": "c",
+        "sstream": "c",
+        "streambuf": "c",
+        "*.inc": "c",
+        "esp_netif.h": "c"
+    }
+}
